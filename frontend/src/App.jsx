@@ -8,8 +8,9 @@ function App() {
   const [ppa, setPpa] = useState('');
   const [regiao, setRegiao] = useState('');
 
-  const gerarRelatorio = async (e) => {
-    e.preventDefault();
+  // Adicionamos o parâmetro 'acao' para saber qual botão foi clicado
+  const gerarRelatorio = async (e, acao = 'embutido') => {
+    if (e) e.preventDefault();
     
     if (!ppa || !regiao) {
       setErro("Por favor, preencha o PPA e a Região para prosseguir.");
@@ -18,7 +19,18 @@ function App() {
 
     setLoading(true);
     setErro(null);
-    setRelatorioUrl(null);
+    
+    if (acao === 'embutido') {
+      setRelatorioUrl(null);
+    }
+
+    // O TRUQUE DO POP-UP: Abre a aba imediatamente antes do fetch começar
+    let novaAba = null;
+    if (acao === 'novaAba') {
+      novaAba = window.open('', '_blank');
+      // Adiciona uma mensagem temporária na aba enquanto o backend trabalha
+      novaAba.document.write('<html style="background:#020617; color:#a855f7; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh;"><body><h2>Gerando relatório no ReportServer, aguarde...</h2></body></html>');
+    }
 
     try {
       const response = await fetch(`http://localhost:8000/api/v1/relatorio/programa-tematico?ppa=${ppa}&regiao=${regiao}`);
@@ -29,9 +41,18 @@ function App() {
 
       const blob = await response.blob();
       const urlLocal = URL.createObjectURL(blob);
-      setRelatorioUrl(urlLocal);
+      
+      if (acao === 'embutido') {
+        // Exibe no visualizador da própria tela
+        setRelatorioUrl(urlLocal);
+      } else if (acao === 'novaAba') {
+        // Redireciona a aba que abrimos para o PDF nativo do Chrome
+        novaAba.location.href = urlLocal;
+      }
+
     } catch (err) {
       setErro(err.message);
+      if (novaAba) novaAba.close(); // Se der erro, fecha a aba fantasma
     } finally {
       setLoading(false);
     }
@@ -40,11 +61,11 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-purple-500/30 relative overflow-hidden">
       
-      {/* Efeitos de Luz no Fundo (Ambient Glow) */}
+      {/* Efeitos de Luz no Fundo */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-900/30 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-amber-600/10 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none"></div>
 
-      {/* Topbar Elegante Glassmorphism */}
+      {/* Topbar Elegante */}
       <nav className="bg-slate-950/50 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -55,11 +76,11 @@ function App() {
                 </svg>
               </div>
               <h1 className="text-xl font-bold tracking-tight text-white">
-                Nexus<span className="font-light text-purple-400">Reports</span>
+                Relatório<span className="font-light text-purple-400">Sigplan</span>
               </h1>
             </div>
             <div className="text-sm font-medium text-amber-500/80">
-              Teste ReportServer - JasperReports
+              Teste geração de relatórios com JasperReports via ReportServer
             </div>
           </div>
         </div>
@@ -74,7 +95,7 @@ function App() {
             <p className="text-sm text-slate-400 mt-1">Defina os filtros abaixo para consultar o JasperReports via ReportServer.</p>
           </div>
 
-          <form onSubmit={gerarRelatorio} className="flex flex-col md:flex-row gap-5 items-end">
+          <form onSubmit={(e) => gerarRelatorio(e, 'embutido')} className="flex flex-col lg:flex-row gap-5 items-end">
             <div className="flex-1 w-full">
               <label className="block text-sm font-medium text-slate-300 mb-1.5">PPA</label>
               <input 
@@ -97,23 +118,30 @@ function App() {
               />
             </div>
 
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full md:w-auto h-[46px] px-8 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-purple-900/40 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none flex items-center justify-center gap-2 min-w-[160px] border border-purple-500/50 disabled:border-white/5"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processando...
-                </>
-              ) : (
-                'Gerar PDF'
-              )}
-            </button>
+            {/* Grupo de Botões */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              {/* Botão Embutido (Principal) */}
+              <button 
+                type="submit"
+                disabled={loading}
+                className="h-[46px] px-6 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-purple-900/40 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none flex items-center justify-center gap-2 border border-purple-500/50 disabled:border-white/5 w-full sm:w-auto min-w-[160px]"
+              >
+                {loading ? 'Processando...' : 'Visualizar na Tela'}
+              </button>
+
+              {/* Botão Nova Aba (Secundário) */}
+              <button 
+                type="button"
+                onClick={(e) => gerarRelatorio(e, 'novaAba')}
+                disabled={loading}
+                className="h-[46px] px-6 bg-transparent hover:bg-purple-900/30 active:bg-purple-900/50 text-purple-400 rounded-xl font-medium transition-all disabled:text-slate-600 flex items-center justify-center gap-2 border border-purple-500/30 hover:border-purple-500/60 disabled:border-white/5 w-full sm:w-auto min-w-[160px]"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Abrir em Nova Aba
+              </button>
+            </div>
           </form>
         </div>
 
@@ -130,7 +158,7 @@ function App() {
           </div>
         )}
 
-        {/* Stage do Relatório */}
+        {/* Stage do Relatório (Continua igual) */}
         <div className={`relative bg-slate-900 rounded-2xl border border-white/10 overflow-hidden transition-all duration-500 ${relatorioUrl ? 'shadow-2xl h-[800px] shadow-purple-900/20' : 'shadow-inner h-[400px] flex items-center justify-center'}`}>
           
           {!relatorioUrl && !loading && !erro && (
