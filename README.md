@@ -43,7 +43,7 @@ Ao abrir a aplicação pela primeira vez:
 3. Após salvar, o relatório aparecerá automaticamente na aba **Gerador**.
 
 ## 🛡️ Segurança
-* As senhas e API Keys são armazenadas localmente no arquivo `nexus_reports.db`.
+* As senhas e API Keys são armazenadas localmente no arquivo `sigplan_reports.db`.
 * O arquivo `.db` e o ambiente de desenvolvimento não devem ser versionados no Git.
 * O código não contém nenhuma referência a dados sensíveis de órgãos públicos.
 
