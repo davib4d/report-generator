@@ -10,7 +10,6 @@ load_dotenv()
 
 app = FastAPI(title="Corporate Report Proxy API")
 
-# Configuração de CORS para o React
 origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -21,45 +20,46 @@ app.add_middleware(
 )
 
 @app.get("/api/v1/relatorio/programa-tematico")
-def obter_relatorio_jasper(ppa: int, regiao: int):
-    # A URL base e credenciais do JasperServer mapeadas no seu .env
-    # Ex: JASPER_URL=http://localhost:8888/jasperserver-pro
-    jasper_url = os.getenv("JASPER_URL") 
-    user = os.getenv("JASPER_USER", "jasperadmin")
-    password = os.getenv("JASPER_PASSWORD")
+def obter_relatorio_reportserver(ppa: int, regiao: int):
+    base_url = os.getenv("REPORTSERVER_URL")
+    user = os.getenv("REPORTSERVER_USER")
+    password = os.getenv("REPORTSERVER_PASSWORD")
+    report_id = os.getenv("REPORTSERVER_REPORT_ID")
     
-    # Caminho exato extraído do seu arquivo .jrxml
-    report_uri = "/reports/GepPAAnexo_ProgramaTematicoPoderExecutivo_Principal"
+    # Endpoint de exportação nativo do ReportServer (InfoFabrik)
+    endpoint = f"{base_url}/reportserver/reportexport"
     
-    # Endpoint da API REST v2 do Jasper para exportar em PDF
-    endpoint = f"{jasper_url}/rest_v2/reports{report_uri}.pdf"
-    
-    # Parâmetros que a procedure do SQL Server está esperando
+    # O ReportServer aceita os parâmetros diretamente na URL
+    # passamos o ID do relatório, o formato desejado (pdf) e os parâmetros do Jasper (ppa, regiao)
     params = {
+        "id": report_id,
+        "format": "pdf",
         "ppa": ppa,
         "regiao": regiao
     }
     
     try:
-        # Faz a chamada autenticada (Basic Auth é o padrão do JasperServer)
+        # A autenticação padrão é via Basic Auth
+        # (Se o seu ReportServer usar apikey, a lógica muda ligeiramente para enviar via Header ou na URL)
         response = requests.get(
             endpoint, 
             params=params, 
             auth=(user, password),
-            timeout=60 # Relatórios complexos podem demorar
+            timeout=60 # Relatórios pesados de SQL Server podem demorar
         )
         
+        # O ReportServer costuma retornar 200 para sucesso
         if response.status_code != 200:
             raise HTTPException(
                 status_code=response.status_code, 
-                detail="Erro ao processar relatório no JasperServer. Verifique os parâmetros."
+                detail=f"Erro ao extrair PDF do ReportServer. Código: {response.status_code}"
             )
             
-        # Devolve o PDF em tempo real para o React
+        # Pega o PDF gerado pelo ReportServer e faz o stream para o React
         return StreamingResponse(
             io.BytesIO(response.content), 
             media_type="application/pdf"
         )
         
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=504, detail=f"Falha de comunicação com o JasperServer: {str(e)}")
+        raise HTTPException(status_code=504, detail=f"Falha de conexão com o ReportServer interno: {str(e)}")
